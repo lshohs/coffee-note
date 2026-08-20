@@ -172,14 +172,6 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--roast-soft);outl
 </head>
 <body>
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="bean" viewBox="0 0 24 24">
-    <ellipse class="shell" cx="12" cy="12" rx="7.4" ry="9.6" transform="rotate(-28 12 12)"/>
-    <path class="crack" d="M8.4 17.6c2.6-1.4 3.4-3.6 3.2-5.7-.2-2.1-1.2-4-3.3-5.3"
-          transform="rotate(-28 12 12)" stroke-linecap="round"/>
-  </symbol>
-</svg>
-
 <div class="wrap">
 
   <header>
@@ -277,8 +269,13 @@ async function api(body){
 }
 
 /* ---------- 화면 그리기 ---------- */
+const BEAN_SHAPE =
+  '<ellipse class="shell" cx="12" cy="12" rx="7.4" ry="9.6" transform="rotate(-28 12 12)"/>'
++ '<path class="crack" d="M8.4 17.6c2.6-1.4 3.4-3.6 3.2-5.7-.2-2.1-1.2-4-3.3-5.3" '
++ 'transform="rotate(-28 12 12)" stroke-linecap="round"/>';
+
 function beanSvg(on){
-  return '<svg class="'+(on?'':'off')+'" viewBox="0 0 24 24" aria-hidden="true"><use href="#bean"/></svg>';
+  return '<svg class="'+(on?'':'off')+'" viewBox="0 0 24 24" aria-hidden="true">'+BEAN_SHAPE+'</svg>';
 }
 
 function buildRating(){
@@ -288,7 +285,7 @@ function buildRating(){
     const b = document.createElement('button');
     b.type='button'; b.className='beanbtn'+(i<=rating?' on':'');
     b.setAttribute('aria-label', i+'점');
-    b.innerHTML = '<svg viewBox="0 0 24 24"><use href="#bean"/></svg>';
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'+BEAN_SHAPE+'</svg>';
     b.onclick = () => { rating = (rating===i? i-1 : i); buildRating(); };
     box.appendChild(b);
   }
@@ -480,7 +477,9 @@ async function load(){
     $('list').innerHTML = '';
     $('banner').innerHTML = '<div class="banner"><b>시트에 연결하지 못했습니다</b>'
       + '오류: ' + esc(e.message) + '<br>'
-      + 'API 주소, SECRET 문자열, 배포 시 액세스 권한(모든 사용자)을 확인해 주세요.</div>';
+      + 'NO_SHEET — 시트 탭 이름이 records 인지 확인하세요.<br>'
+      + 'AUTH — 웹앱과 Apps Script의 SECRET 문자열이 다릅니다.<br>'
+      + 'Failed to fetch — 배포 액세스 권한이 “모든 사용자”인지 확인하세요.</div>';
     renderStats();
   }
 }
