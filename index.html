@@ -161,15 +161,14 @@ textarea{resize:vertical;min-height:76px;line-height:1.65}
   margin-bottom:10px;
 }
 .card:active{background:#F9F3E6}
-.card .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .card .bean{
-  font-family:var(--serif);font-weight:700;font-size:17px;
-  letter-spacing:-.01em;flex:1;min-width:0;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--serif);font-weight:700;font-size:17.5px;
+  letter-spacing:-.01em;line-height:1.35;
+  word-break:break-word;
 }
-.card .date{font-size:12px;color:var(--muted);flex:0 0 auto}
-.card .meta{font-size:12.5px;color:var(--muted);margin-top:3px}
-.card .note{font-size:13.5px;margin-top:7px;color:#4A3D34}
+.card .meta{font-size:12.5px;color:var(--muted);margin-top:5px}
+.card .cup{font-size:13px;color:#6B5B4E;margin-top:6px}
+.card .note{font-size:13.5px;margin-top:4px;color:#4A3D34}
 .mini{display:inline-flex;gap:2px;vertical-align:-2px;margin-right:5px}
 .mini svg{width:12px;height:12px}
 .mini .shell{fill:var(--line)}
@@ -422,7 +421,10 @@ function init(){
 async function load(){
   try{
     const r = await api({action:'list'});
-    records = (r.rows||[]).sort((a,b)=> String(b.date).localeCompare(String(a.date)));
+    records = (r.rows||[]).map(row => {
+      row.date = toISO(row.date);
+      return row;
+    }).sort((a,b)=> String(b.date).localeCompare(String(a.date)));
     fillDatalists();
     render();
   }catch(e){
@@ -430,9 +432,38 @@ async function load(){
   }
 }
 
+/* 시트에서 오는 날짜는 형식이 제각각이라 여기서 2026-08-20 형태로 통일 */
+function toISO(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return m[1] + '-' + pad(m[2]) + '-' + pad(m[3]);
+  // "Thu Aug 20 2026 00:00:00 GMT+0900 (한국 표준시)" 같은 형태 — 시간대 변환 없이 글자 그대로 읽는다
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const t = s.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})\b/);
+  if(t && MON.indexOf(t[1]) >= 0){
+    return t[3] + '-' + pad(MON.indexOf(t[1]) + 1) + '-' + pad(t[2]);
+  }
+  const d = new Date(s.replace(/\s*\(.*\)\s*$/, ''));
+  if(!isNaN(d.getTime())){
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  }
+  return s;
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+
+/* 화면에 보여줄 때: 올해면 "8월 20일", 지난해면 "2025년 8월 20일" */
+function fmtDate(iso){
+  const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return String(iso||'');
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const txt = mo + '월 ' + d + '일';
+  return y === new Date().getFullYear() ? txt : y + '년 ' + txt;
+}
+
 function today(){
-  const d = new Date(), p = n => String(n).padStart(2,'0');
-  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
 }
 
 /* ── 평점 위젯 ────────────────── */
@@ -538,8 +569,7 @@ function filtered(){
   if(fTerm){
     const d = new Date();
     d.setDate(d.getDate() - fTerm);
-    const p = n => String(n).padStart(2,'0');
-    limit = d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+    limit = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   }
   return records.filter(r => {
     if(fRate && Number(r.rating||0) < fRate) return false;
@@ -569,12 +599,12 @@ function render(){
   }
 
   box.innerHTML = rows.map(r => {
-    const meta = [r.place, r.cupNote].filter(Boolean).join(' · ');
+    const line = [fmtDate(r.date), r.place].filter(Boolean).join(' · ');
     return '<button class="card" onclick="openSheet(\'' + esc(r.id) + '\')">' +
-      '<div class="top"><span class="bean">' + esc(r.bean || '(원두명 없음)') + '</span>' +
-      '<span class="date">' + esc(r.date) + '</span></div>' +
-      '<div class="meta">' + miniBeans(r.rating) + esc(meta) + '</div>' +
-      (r.myNote ? '<div class="note">' + esc(cut(r.myNote, 60)) + '</div>' : '') +
+      '<div class="bean">' + esc(r.bean || '(원두명 없음)') + '</div>' +
+      '<div class="meta">' + miniBeans(r.rating) + esc(line) + '</div>' +
+      (r.cupNote ? '<div class="cup">' + esc(cut(r.cupNote, 46)) + '</div>' : '') +
+      (r.myNote ? '<div class="note">' + esc(cut(r.myNote, 55)) + '</div>' : '') +
       '</button>';
   }).join('');
 }
@@ -593,7 +623,7 @@ function openSheet(id){
   if(!r) return;
   curId = id;
   $('d-bean').textContent = r.bean || '(원두명 없음)';
-  $('d-sub').innerHTML = miniBeans(r.rating) + esc([r.date, r.place].filter(Boolean).join(' · '));
+  $('d-sub').innerHTML = miniBeans(r.rating) + esc([fmtDate(r.date), r.place].filter(Boolean).join(' · '));
   const rows = [];
   if(r.cupNote) rows.push(['컵노트', r.cupNote]);
   if(r.myNote)  rows.push(['내 느낌', r.myNote]);
@@ -614,7 +644,7 @@ function startEdit(){
   const r = find(curId);
   if(!r) return;
   editId = r.id;
-  $('f-date').value  = r.date || today();
+  $('f-date').value  = toISO(r.date) || today();
   $('f-bean').value  = r.bean || '';
   $('f-cup').value   = r.cupNote || '';
   $('f-place').value = r.place || '';
@@ -653,7 +683,7 @@ function blogText(r){
   const beans = '●'.repeat(Number(r.rating)||0) + '○'.repeat(5 - (Number(r.rating)||0));
   const lines = [];
   lines.push('☕ ' + (r.bean || ''));
-  lines.push([r.date, r.place].filter(Boolean).join(' · '));
+  lines.push([fmtDate(r.date), r.place].filter(Boolean).join(' · '));
   lines.push('');
   if(r.cupNote) lines.push('컵노트 | ' + r.cupNote);
   lines.push('평점 | ' + beans + ' (' + (Number(r.rating)||0) + '/5)');
